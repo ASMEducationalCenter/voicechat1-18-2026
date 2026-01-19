@@ -1,0 +1,7 @@
+{
+  "name": "ASM IT Help Desk Interview Coach -Youth 18-24",
+  "description": "A voice-based mock interview trainer for Tier 1 IT Help Desk candidates, featuring real-time feedback and coaching.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
