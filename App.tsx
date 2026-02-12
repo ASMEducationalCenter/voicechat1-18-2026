@@ -1,10 +1,12 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Modality, Blob, LiveServerMessage } from '@google/genai';
 import { InterviewStatus, TranscriptionItem } from './types';
 import { INTERVIEW_QUESTIONS, SYSTEM_INSTRUCTION } from './constants';
+import Timer from './Timer';
 
-// --- Utility Functions for Audio ---
+import AuthPanel from "./AuthPanel";
+
+// ---- Utility Functions for Audio ----
 
 function encode(bytes: Uint8Array) {
   let binary = '';
@@ -127,7 +129,28 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<InterviewStatus>(InterviewStatus.IDLE);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
+
+  //  Timer additions (only new state)
+  const [resetKey, setResetKey] = useState(0);
+  const [timeUp, setTimeUp] = useState(false);
+
+  // Auth gate: track logged-in user
+  const [user, setUser] = useState<any>(null);
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      const data = await res.json();
+      setUser(data.user || null);
+    } catch {
+      setUser(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMe();
+  }, [refreshMe]);
+
   const sessionRef = useRef<any>(null);
   const audioContextInRef = useRef<AudioContext | null>(null);
   const audioContextOutRef = useRef<AudioContext | null>(null);
@@ -160,11 +183,26 @@ const App: React.FC = () => {
     setStatus(InterviewStatus.FINISHED);
   }, []);
 
+  // Timer additions: when time is up, end the session using your existing stopSession()
+  const handleTimeUp = useCallback(() => {
+    setTimeUp(true);
+    stopSession();
+  }, [stopSession]);
+
   const startInterview = async () => {
     try {
+      // ✅ Hard block (even if someone bypasses the disabled button)
+      if (!user) {
+        throw new Error("Please login first to start the mock interview.");
+      }
+
       setStatus(InterviewStatus.CONNECTING);
       setErrorMsg(null);
       setTranscriptions([]);
+
+      // Timer additions: reset timer + timeUp each new session
+      setTimeUp(false);
+      setResetKey((k) => k + 1);
 
       const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
       if (!apiKey) throw new Error("API Key is missing");
@@ -195,7 +233,7 @@ const App: React.FC = () => {
             setStatus(InterviewStatus.ACTIVE);
             const source = inCtx.createMediaStreamSource(stream);
             const scriptProcessor = inCtx.createScriptProcessor(4096, 1, 1);
-            
+
             scriptProcessor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const pcmBlob = createBlob(inputData);
@@ -243,11 +281,11 @@ const App: React.FC = () => {
             if (message.serverContent?.turnComplete) {
               const userInput = currentInputTranscriptionRef.current;
               const coachOutput = currentOutputTranscriptionRef.current;
-              
+
               const newItems: TranscriptionItem[] = [];
               if (userInput) newItems.push({ role: 'user', text: userInput, timestamp: Date.now() });
               if (coachOutput) newItems.push({ role: 'model', text: coachOutput, timestamp: Date.now() });
-              
+
               if (newItems.length > 0) {
                 setTranscriptions(prev => [...prev, ...newItems]);
               }
@@ -264,7 +302,7 @@ const App: React.FC = () => {
           onclose: () => {
             console.log('Session Closed');
             if (status !== InterviewStatus.FINISHED) {
-                setStatus(InterviewStatus.FINISHED);
+              setStatus(InterviewStatus.FINISHED);
             }
           }
         }
@@ -283,6 +321,10 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col pb-12">
       <Header />
 
+      <div className="max-w-4xl mx-auto w-full px-4 -mt-4 mb-6">
+        <AuthPanel />
+      </div>
+
       <main className="flex-1 max-w-4xl mx-auto w-full px-4">
         {status === InterviewStatus.IDLE && (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
@@ -297,6 +339,16 @@ const App: React.FC = () => {
                 Experience a realistic, voice-based mock interview for an IT Help Desk role. 
                 We'll cover 30 essential questions with professional feedback for each one.
               </p>
+
+              {/* ✅ Added message when not logged in */}
+              {!user && (
+                <div className="max-w-xl mx-auto mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+                  <div className="text-sm font-bold text-amber-900">Login required</div>
+                  <div className="text-sm text-amber-800">
+                    Please login above to begin your mock interview session.
+                  </div>
+                </div>
+              )}
               
               <div className="grid md:grid-cols-3 gap-4 mb-10 text-left">
                 {[
@@ -311,9 +363,13 @@ const App: React.FC = () => {
                 ))}
               </div>
 
+              {/* ✅ Disabled when not logged in */}
               <button
                 onClick={startInterview}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center mx-auto text-lg"
+                disabled={!user}
+                className={`bg-blue-600 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all transform flex items-center mx-auto text-lg
+                  ${user ? "hover:bg-blue-700 hover:scale-105" : "opacity-50 cursor-not-allowed"}
+                `}
               >
                 Start Mock Interview
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,6 +397,13 @@ const App: React.FC = () => {
 
         {status === InterviewStatus.ACTIVE && (
           <div className="space-y-6">
+            <Timer
+              minutes={30}
+              running={status === InterviewStatus.ACTIVE}
+              resetKey={resetKey}
+              onTimeUp={handleTimeUp}
+            />
+
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-3">
@@ -393,9 +456,15 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Interview Session Completed</h2>
+
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">
+              {timeUp ? "Time’s up" : "Interview Session Completed"}
+            </h2>
+
             <p className="text-slate-600 text-lg mb-8">
-              Great job finishing the mock interview. You can review the transcription below or start a new session.
+              {timeUp
+                ? "Your 30-minute session has ended. You can restart the interview from the beginning."
+                : "Great job finishing the mock interview. You can review the transcription below or start a new session."}
             </p>
             
             <div className="text-left mb-10">
@@ -407,7 +476,7 @@ const App: React.FC = () => {
               onClick={() => setStatus(InterviewStatus.IDLE)}
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all"
             >
-              Back to Start
+              {timeUp ? "Restart Interview" : "Back to Start"}
             </button>
           </div>
         )}
@@ -446,3 +515,7 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
+
+
