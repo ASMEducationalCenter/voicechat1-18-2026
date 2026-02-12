@@ -191,7 +191,7 @@ const App: React.FC = () => {
 
   const startInterview = async () => {
     try {
-      // ✅ Hard block (even if someone bypasses the disabled button)
+      // Hard block (even if someone bypasses the disabled button)
       if (!user) {
         throw new Error("Please login first to start the mock interview.");
       }
