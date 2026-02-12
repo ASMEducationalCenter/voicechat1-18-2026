@@ -134,7 +134,7 @@ const App: React.FC = () => {
   const [resetKey, setResetKey] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
 
-  // ✅ Auth gate: track logged-in user
+  // Auth gate: track logged-in user
   const [user, setUser] = useState<any>(null);
 
   const refreshMe = useCallback(async () => {
