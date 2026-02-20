@@ -56,12 +56,7 @@ export default function AuthPanel({
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // ✅ Email form message (keep as-is)
   const [msg, setMsg] = useState<string | null>(null);
-
-  // ✅ Google-only message (NEW)
-  const [googleMsg, setGoogleMsg] = useState<string | null>(null);
 
   // Forgot password UI
   const [resetMode, setResetMode] = useState(false);
@@ -124,24 +119,16 @@ export default function AuthPanel({
   }
 
   async function loginGoogle() {
-    // ✅ Google uses googleMsg only
-    setGoogleMsg(null);
+    setMsg(null);
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       await enforceAllowlistOrLogout(cred.user);
-
       setResetMode(false);
       setResetSent(false);
       setShowEmailForm(false);
-      setMsg(null); // clear email msg on successful Google login
     } catch (e: any) {
-      const m = (e?.message || "").toString();
-      if (m.includes("Access denied")) {
-        setGoogleMsg("Hey Google account not authorized. Please contact ASM Center staff.");
-      } else {
-        setGoogleMsg(e?.message || "Google login failed.");
-      }
+      setMsg(e?.message || "Google login failed.");
     } finally {
       setLoading(false);
     }
@@ -149,10 +136,7 @@ export default function AuthPanel({
 
   async function submitEmailPassword(e: React.FormEvent) {
     e.preventDefault();
-
-    // ✅ Email uses msg only
     setMsg(null);
-    setGoogleMsg(null); // prevent Google message from ever showing during email flows
     setResetSent(false);
 
     if (resetMode) {
@@ -221,7 +205,6 @@ export default function AuthPanel({
 
   async function logoutFirebase() {
     setMsg(null);
-    setGoogleMsg(null);
     setLoading(true);
     try {
       await signOut(auth);
@@ -258,10 +241,7 @@ export default function AuthPanel({
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowEmailForm((v) => !v);
-                    setGoogleMsg(null); // ✅ don't keep Google message when switching to email UI
-                  }}
+                  onClick={() => setShowEmailForm((v) => !v)}
                   disabled={loading}
                   className="bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-900 font-bold py-2 px-4 rounded-lg border border-slate-200"
                 >
@@ -269,11 +249,6 @@ export default function AuthPanel({
                 </button>
               </div>
             </div>
-
-            {/* ✅ Google message ONLY shows here, and only when email form is closed */}
-            {!showEmailForm && googleMsg && (
-              <div className="mt-2 text-sm text-red-600">{googleMsg}</div>
-            )}
 
             {showEmailForm && (
               <div className="mt-4 border-t border-slate-100 pt-4">
@@ -285,7 +260,6 @@ export default function AuthPanel({
                       setResetMode(false);
                       setResetSent(false);
                       setMsg(null);
-                      setGoogleMsg(null);
                     }}
                     className={`text-sm font-semibold px-3 py-1 rounded-lg border ${
                       mode === "signin"
@@ -303,7 +277,6 @@ export default function AuthPanel({
                       setResetMode(false);
                       setResetSent(false);
                       setMsg(null);
-                      setGoogleMsg(null);
                     }}
                     className={`text-sm font-semibold px-3 py-1 rounded-lg border ${
                       mode === "signup"
@@ -370,7 +343,11 @@ export default function AuthPanel({
                       disabled={!canSubmit || loading}
                       className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2 px-4 rounded-lg"
                     >
-                      {resetMode ? "Send reset link" : mode === "signup" ? "Create account" : "Sign in"}
+                      {resetMode
+                        ? "Send reset link"
+                        : mode === "signup"
+                        ? "Create account"
+                        : "Sign in"}
                     </button>
 
                     {/* Forgot password button ONLY in Sign In mode */}
@@ -389,9 +366,7 @@ export default function AuthPanel({
                       </button>
                     )}
 
-                    {/* ✅ Email message stays here (as-is) */}
                     {msg && <span className="text-sm text-red-600">{msg}</span>}
-
                     {resetSent && !msg && (
                       <span className="text-sm text-green-700">
                         Reset link sent. Check inbox/spam.
@@ -443,4 +418,6 @@ export default function AuthPanel({
     </div>
   );
 }
+
+
 
