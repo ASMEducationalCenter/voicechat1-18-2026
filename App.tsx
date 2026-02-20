@@ -5,7 +5,7 @@ import { InterviewStatus, TranscriptionItem } from './types';
 import { INTERVIEW_QUESTIONS, SYSTEM_INSTRUCTION } from './constants';
 import Timer from './Timer';
 
-// ✅ Firebase Auth (Option B: use AuthPanel for Google + Email/Password
+// ✅ Firebase Auth (Option B: use AuthPanel for Google + Email/Password)
 import { auth } from "./firebase";
 import AuthPanel from "./AuthPanel";
 import type { User } from "firebase/auth";
