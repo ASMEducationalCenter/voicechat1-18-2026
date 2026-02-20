@@ -1,10 +1,17 @@
+// App.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Modality, Blob, LiveServerMessage } from '@google/genai';
 import { InterviewStatus, TranscriptionItem } from './types';
 import { INTERVIEW_QUESTIONS, SYSTEM_INSTRUCTION } from './constants';
 import Timer from './Timer';
 
+// ✅ Firebase Auth (Option B: use AuthPanel for Google + Email/Password
+import { auth } from "./firebase";
 import AuthPanel from "./AuthPanel";
+import type { User } from "firebase/auth";
+
+// ✅ NEW: PDF download helper (root file)
+import { downloadTranscriptPdf } from "./transcriptPdf";
 
 // ---- Utility Functions for Audio ----
 
@@ -70,7 +77,7 @@ const TranscriptionDisplay: React.FC<{ items: TranscriptionItem[] }> = ({ items 
   }, [items]);
 
   return (
-    <div 
+    <div
       ref={scrollRef}
       className="bg-white rounded-xl shadow-inner border border-slate-200 h-64 overflow-y-auto p-4 space-y-4"
     >
@@ -80,17 +87,17 @@ const TranscriptionDisplay: React.FC<{ items: TranscriptionItem[] }> = ({ items 
         </div>
       )}
       {items.map((item, idx) => (
-        <div 
-          key={idx} 
+        <div
+          key={idx}
           className={`flex flex-col ${item.role === 'user' ? 'items-end' : 'items-start'}`}
         >
           <span className="text-[10px] uppercase font-bold text-slate-400 mb-1">
             {item.role === 'user' ? 'You' : 'Coach'}
           </span>
-          <div 
+          <div
             className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
-              item.role === 'user' 
-                ? 'bg-blue-600 text-white rounded-tr-none' 
+              item.role === 'user'
+                ? 'bg-blue-600 text-white rounded-tr-none'
                 : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200 shadow-sm'
             }`}
           >
@@ -130,26 +137,12 @@ const App: React.FC = () => {
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // ✅ Firebase user state (AuthPanel will update this)
+  const [user, setUser] = useState<User | null>(null);
+
   //  Timer additions (only new state)
   const [resetKey, setResetKey] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
-
-  // Auth gate: track logged-in user
-  const [user, setUser] = useState<any>(null);
-
-  const refreshMe = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      const data = await res.json();
-      setUser(data.user || null);
-    } catch {
-      setUser(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshMe();
-  }, [refreshMe]);
 
   const sessionRef = useRef<any>(null);
   const audioContextInRef = useRef<AudioContext | null>(null);
@@ -183,6 +176,15 @@ const App: React.FC = () => {
     setStatus(InterviewStatus.FINISHED);
   }, []);
 
+  // ✅ End interview immediately if user logs out
+  useEffect(() => {
+    if (!user && status === InterviewStatus.ACTIVE) {
+      stopSession();
+      setErrorMsg("You were logged out. The interview has ended.");
+      setStatus(InterviewStatus.ERROR);
+    }
+  }, [user, status, stopSession]);
+
   // Timer additions: when time is up, end the session using your existing stopSession()
   const handleTimeUp = useCallback(() => {
     setTimeUp(true);
@@ -191,9 +193,11 @@ const App: React.FC = () => {
 
   const startInterview = async () => {
     try {
-      // Hard block (even if someone bypasses the disabled button)
-      if (!user) {
-        throw new Error("Please login first to start the mock interview.");
+      // ✅ REQUIRE LOGIN
+      if (!auth.currentUser) {
+        setErrorMsg("Please login before starting the interview.");
+        setStatus(InterviewStatus.ERROR);
+        return;
       }
 
       setStatus(InterviewStatus.CONNECTING);
@@ -321,35 +325,26 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col pb-12">
       <Header />
 
-      <div className="max-w-4xl mx-auto w-full px-4 -mt-4 mb-6">
-        <AuthPanel />
-      </div>
+      {/* ✅ Option B: AuthPanel (Google + Email/Password) */}
+      <AuthPanel onUserChange={setUser} />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4">
         {status === InterviewStatus.IDLE && (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
             <div className="p-8 md:p-12 text-center">
               <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                {/* ✅ Mic icon stays here (as original) */}
                 <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </div>
+
               <h2 className="text-3xl font-bold text-slate-900 mb-4">Ready for your Interview?</h2>
               <p className="text-slate-600 max-w-xl mx-auto mb-8 text-lg leading-relaxed">
-                Experience a realistic, voice-based mock interview for an IT Help Desk role. 
+                Experience a realistic, voice-based mock interview for an IT Help Desk role.
                 We'll cover 30 essential questions with professional feedback for each one.
               </p>
 
-              {/* ✅ Added message when not logged in */}
-              {!user && (
-                <div className="max-w-xl mx-auto mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
-                  <div className="text-sm font-bold text-amber-900">Login required</div>
-                  <div className="text-sm text-amber-800">
-                    Please login above to begin your mock interview session.
-                  </div>
-                </div>
-              )}
-              
               <div className="grid md:grid-cols-3 gap-4 mb-10 text-left">
                 {[
                   { icon: "✓", title: "30 Questions", desc: "Comprehensive Tier 1 coverage" },
@@ -363,13 +358,13 @@ const App: React.FC = () => {
                 ))}
               </div>
 
-              {/* ✅ Disabled when not logged in */}
+              {/* ✅ Grey out when not logged in */}
               <button
                 onClick={startInterview}
                 disabled={!user}
-                className={`bg-blue-600 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all transform flex items-center mx-auto text-lg
-                  ${user ? "hover:bg-blue-700 hover:scale-105" : "opacity-50 cursor-not-allowed"}
-                `}
+                className={`bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center mx-auto text-lg ${
+                  user ? "" : "bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed transform-none"
+                }`}
               >
                 Start Mock Interview
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,6 +418,7 @@ const App: React.FC = () => {
                 </button>
               </div>
 
+              {/* ✅ This is your mic icon block during interview (kept) */}
               <div className="mb-10 text-center">
                 <div className="inline-block p-4 rounded-full bg-blue-50 border-4 border-blue-100 mb-6">
                   <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -466,18 +462,29 @@ const App: React.FC = () => {
                 ? "Your 30-minute session has ended. You can restart the interview from the beginning."
                 : "Great job finishing the mock interview. You can review the transcription below or start a new session."}
             </p>
-            
+
             <div className="text-left mb-10">
               <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Final Session Log</h4>
               <TranscriptionDisplay items={transcriptions} />
             </div>
 
-            <button
-              onClick={() => setStatus(InterviewStatus.IDLE)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all"
-            >
-              {timeUp ? "Restart Interview" : "Back to Start"}
-            </button>
+            {/* ✅ ONLY CHANGE IN FINISHED UI: add Download PDF button + keep Back to Start */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => downloadTranscriptPdf(transcriptions)}
+                disabled={transcriptions.length === 0}
+                className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all"
+              >
+                Download Chat Summary (PDF)
+              </button>
+
+              <button
+                onClick={() => setStatus(InterviewStatus.IDLE)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-all"
+              >
+                {timeUp ? "Restart Interview" : "Back to Start"}
+              </button>
+            </div>
           </div>
         )}
 
