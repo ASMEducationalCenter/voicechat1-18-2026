@@ -16,7 +16,7 @@ import asmLogo from "./assets/asm-logo.png";
 // ✅ ADDED: PDF download helper
 import { downloadTranscriptPdf } from "./transcriptPdf";
 
-// ---- Utility Functions for Audio ----
+// ---- Utility Functions for Audio ---
 
 function encode(bytes: Uint8Array) {
   let binary = '';
