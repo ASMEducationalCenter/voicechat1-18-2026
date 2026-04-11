@@ -11,7 +11,7 @@ export async function isEmailAllowlisted(email: string): Promise<boolean> {
     return true;
   }
   const emailNormalized = email.trim().toLowerCase();
-  if (emailNormalized === 'benb7553s@gmail.com') return true;
+  if (emailNormalized === 'hamedm@asmed.com') return true;
   const ref = doc(db, "allowlist", emailNormalized);
   try {
     const snap = await getDoc(ref);
