@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 
-const ADMIN_EMAIL = 'benb7553s@gmail.com';
+const ADMIN_EMAIL = 'hamedm@asmed.com';
 const TRIAL_DAYS = 90;
 const WARNING_DAYS = 14;
 
