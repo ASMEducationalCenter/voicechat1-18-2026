@@ -13,7 +13,7 @@ import ErrorView from "./components/interview/ErrorView";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import type { User } from "firebase/auth";
 
-const ADMIN_EMAIL = 'benb7553s@gmail.com';
+const ADMIN_EMAIL = 'hamedm@asmed.com';
 const TRIAL_DAYS = 90;
 
 const App: React.FC = () => {
