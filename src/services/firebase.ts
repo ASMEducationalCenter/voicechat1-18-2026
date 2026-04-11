@@ -29,7 +29,7 @@ export enum OperationType {
   WRITE = "write",
 }
 
-export const ADMIN_EMAIL = "benb7553s@gmail.com";
+export const ADMIN_EMAIL = 'hamedm@asmed.com';
 export const TRIAL_DAYS = 90;
 
 export function isUserAdmin(email?: string | null, role?: string) {
