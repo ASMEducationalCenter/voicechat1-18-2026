@@ -16,7 +16,7 @@ const Header: React.FC = () => (
             ASM Educational Center
           </h1>
           <p className="text-sm text-slate-500 font-medium">
-            Cyber Interview Coach
+            IT Help Desk Mock Interview Coach
           </p>
         </div>
       </div>
